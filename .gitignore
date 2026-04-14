@@ -1,0 +1,8 @@
+# Development dependencies (not needed for the website)
+node_modules/
+
+# Local Claude Code settings
+.claude/
+
+# Source documents (large files, not needed to run the site)
+Document/
