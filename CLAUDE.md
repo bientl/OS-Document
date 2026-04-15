@@ -151,10 +151,11 @@ Current groups and their sections:
 | Getting Started | `intro` |
 | Built-in Protections | `secure-code`, `session`, `auth`, `rbac`, `brute-force`, `https`, `auditing`, `vuln-mgmt` |
 | Developer Responsibilities | `permissions`, `logging`, `errors`, `custom-code`, `data-encrypt`, `mobile`, `best-practices` |
-| Runtime Environment | `passwords`, `end-user-auth`, `it-user-auth`, `transit`, `rest`, `csp`, `cookies`, `viewstate`, `console-access` |
+| Runtime Environment | `passwords`, `end-user-auth`, `end-user-mgmt`, `it-user-auth`, `transit`, `rest`, `csp`, `cookies`, `viewstate`, `console-access`, `hardening` |
 | After Development | `sast`, `pentest` |
 | Reactive Web Apps | `reactive-client`, `reactive-server`, `reactive-tips` |
 | Reference | `owasp` |
+| Compliance | `hipaa` |
 
 ---
 
@@ -218,6 +219,14 @@ Use these existing classes — do not invent new ones unless necessary.
 | `outsystems-application-security.pdf` | Full security guide (54 pages) | All sections except reactive and OWASP mobile |
 | `Develop secure OutSystems app.docx` | Secure development practices | Merged into relevant Developer Responsibilities sections |
 | `Best practices for reactive web security.docx` | Reactive Web App security (client-side, server-side, tips) | `reactive-client`, `reactive-server`, `reactive-tips` |
+| `Document/New/Apply Content Security Policy.docx` | CSP configuration (LifeTime/Service Center), monitoring, misconfiguration risks, unsafe directives removal, MABS/mobile CSP | Expanded `csp` section |
+| `Document/New/End Users.docx` | Internal/external user classification, auth flow, user sync, custom roles, permission validation in app logic | New `end-user-mgmt` section |
+| `Document/New/Protection against Brute Force Attacks.docx` | User-level vs IP-level attacks, two-step backoff mechanism, unblocking app users and IT users | Expanded `brute-force` section |
+| `Document/New/Injection and Cross Site Script.docx` | EncodeSql, Expand Inline warning, HTML/JS injection TrueChange warnings, EncodeUrl for dynamic URLs | Expanded `custom-code` section |
+| `Document/New/How OutSystems helps you address OWASP Top 10.docx` | OWASP 2021 Web Top 10, Low Code/No Code Top 10 (2022), Mobile Top 10 details | Updated `owasp` section |
+| `Document/New/How  OutSystems Helps You Develop Secure App.docx` | CSRF mechanism (osVisitor + view state for traditional, X-CSRFToken for reactive), API CSRF responsibility | Expanded CSRF entry in `secure-code` section |
+| `Document/New/OutSystems Platform Server hardening.docx` | Admin password setup, SSL certs, internal network, VPN, AppShield, security headers, encryption at rest | New `hardening` section |
+| `Document/New/HIPAA compliance.docx` | HIPAA ePHI requirements, access control, audit trails, session logoff, encryption, failover, HIPAA Cloud offering | New `hipaa` section, new Compliance nav group |
 
 When a new document is added, append a row to this table after processing it.
 
